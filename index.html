@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PhysioCopilot - Hombro</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --danger: #dc2626;
+            --bg: #f3f4f6;
+            --card: #ffffff;
+            --text: #1f2937;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+        }
+        #app-container {
+            width: 100%;
+            max-width: 480px;
+            background: var(--card);
+            min-height: 100vh;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        .screen {
+            padding: 20px;
+            display: none;
+        }
+        .screen.active {
+            display: block;
+        }
+        h2 { font-size: 1.3rem; margin-top: 0; }
+        .checkbox-group {
+            margin-bottom: 15px;
+            padding: 15px;
+            background: var(--bg);
+            border-radius: 8px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .checkbox-group input { margin-top: 5px; margin-right: 10px; transform: scale(1.3); }
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background-color: var(--primary);
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        button.danger { background-color: var(--danger); }
+        button.secondary { background-color: #6b7280; }
+        .alert {
+            background-color: #fef2f2;
+            color: var(--danger);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #f87171;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 20px;
+            display: none;
+        }
+        .test-card {
+            background: var(--bg);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+        }
+        .result-box {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <header>PhysioCopilot | Hombro</header>
+
+    <!-- PANTALLA 1: BANDERAS ROJAS -->
+    <div id="screen-redflags" class="screen active">
+        <h2>1. Triaje: Banderas Rojas</h2>
+        <p>¿Presenta el paciente alguno de estos signos?</p>
+        
+        <label class="checkbox-group">
+            <input type="checkbox" class="redflag">
+            Trauma severo reciente o deformidad evidente (caída fuerte).
+        </label>
+        <label class="checkbox-group">
+            <input type="checkbox" class="redflag">
+            Dolor opresivo irradiado al brazo izquierdo + sudoración/falta de aire.
+        </label>
+        <label class="checkbox-group">
+            <input type="checkbox" class="redflag">
+            Dolor nocturno constante, profundo + pérdida de peso inexplicable.
+        </label>
+        <label class="checkbox-group">
+            <input type="checkbox" class="redflag">
+            Fiebre, enrojecimiento y calor extremo en la articulación.
+        </label>
+
+        <button onclick="checkRedFlags()">Siguiente paso</button>
+        
+        <div id="alert-redflag" class="alert">
+            🛑 ALTO: Posible patología grave (fractura, infarto, tumor, infección). Derivar inmediatamente a Urgencias o Médico Especialista. NO tratar.
+        </div>
+    </div>
+
+    <!-- PANTALLA 2: SÍNTOMA PRINCIPAL -->
+    <div id="screen-symptoms" class="screen">
+        <h2>2. Patrón del Dolor</h2>
+        <p>Selecciona la limitación principal:</p>
+        
+        <button onclick="selectSymptom('A')">Dolor arco medio (60º-120º) al elevar el brazo</button>
+        <button onclick="selectSymptom('B')">Rigidez global pasiva y activa (Hombro congelado)</button>
+        <button onclick="selectSymptom('C')">Sensación de inestabilidad, luxación o que "se sale"</button>
+        <button onclick="selectSymptom('D')">Dolor irradiado al cuello/mano con hormigueos</button>
+        
+        <button class="secondary" style="margin-top:20px;" onclick="restartApp()">Volver atrás</button>
+    </div>
+
+    <!-- PANTALLA 3: TEST ORTOPÉDICOS -->
+    <div id="screen-tests" class="screen">
+        <h2>3. Validación Clínica</h2>
+        <div id="test-content" class="test-card"></div>
+        <button onclick="showResult(true)">Sí, test POSITIVO</button>
+        <button class="secondary" onclick="showResult(false)">No, test NEGATIVO</button>
+    </div>
+
+    <!-- PANTALLA 4: RESULTADO -->
+    <div id="screen-result" class="screen">
+        <h2>4. Conclusión Clínica</h2>
+        <div id="final-diagnosis" class="result-box"></div>
+        <button onclick="restartApp()">Evaluar otro paciente</button>
+    </div>
+
+</div>
+
+<script>
+    let currentSymptom = '';
+
+    const testData = {
+        'A': {
+            instruction: "Realiza el <strong>Test de Jobe</strong> y el <strong>Test de Hawkins-Kennedy</strong>. ¿Son positivos y reproducen el dolor exacto del paciente?",
+            pos: "<strong>Diagnóstico Funcional:</strong> Patrón compatible con Síndrome Subacromial / Tendinopatía Manguito Rotador.<br><br><strong>Recomendación:</strong> Control de carga analgésico, isométricos de rotadores y evaluar discinesia escapular.",
+            neg: "<strong>Aviso:</strong> Los test no confirman origen subacromial claro. Reevaluar columna cervical o implicación de la articulación acromioclavicular."
+        },
+        'B': {
+            instruction: "Mide la Rotación Externa pasiva con los brazos pegados al cuerpo. ¿Hay una pérdida mayor al 50% comparado con el hombro sano?",
+            pos: "<strong>Diagnóstico Funcional:</strong> Patrón compatible con Capsulitis Retráctil (Fase de rigidez).<br><br><strong>Recomendación:</strong> Explicar tiempos largos de curación. Terapia manual suave para dolor. Evitar estiramientos agresivos.",
+            neg: "<strong>Aviso:</strong> Si la movilidad pasiva está conservada, el problema es muscular/motor, no capsular."
+        },
+        'C': {
+            instruction: "Realiza el <strong>Test de Aprehensión anterior</strong>. ¿Siente aprensión, miedo o defensa muscular inminente a que se luxe?",
+            pos: "<strong>Diagnóstico Funcional:</strong> Patrón de Inestabilidad Anterior de Hombro.<br><br><strong>Recomendación:</strong> Fortalecimiento intenso de estabilizadores dinámicos (manguito y escapulares) en rangos seguros. Evitar posiciones extremas (Abducción + Rot. Externa).",
+            neg: "<strong>Aviso:</strong> Sin aprensión franca, descartar inestabilidad estructural severa. Valorar déficit de control motor."
+        },
+        'D': {
+            instruction: "Realiza el <strong>Test de Spurling</strong> (Compresión cervical) y test de tensión neural. ¿Reproducen el hormigueo hacia el brazo?",
+            pos: "<strong>Diagnóstico Funcional:</strong> Patrón de Radiculopatía Cervical / Dolor neurogénico.<br><br><strong>Recomendación:</strong> Terapia manual cervical, apertura de agujeros de conjunción y movilización neuromeníngea progresiva. No centrar el tratamiento local en el hombro.",
+            neg: "<strong>Aviso:</strong> Si lo neural es negativo, descartar Puntos Gatillo miofasciales que irradien (ej. Infraespinoso o Escalenos)."
+        }
+    };
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function checkRedFlags() {
+        const checkboxes = document.querySelectorAll('.redflag');
+        let hasRedFlag = false;
+        checkboxes.forEach(cb => { if(cb.checked) hasRedFlag = true; });
+
+        if (hasRedFlag) {
+            document.getElementById('alert-redflag').style.display = 'block';
+        } else {
+            document.getElementById('alert-redflag').style.display = 'none';
+            showScreen('screen-symptoms');
+        }
+    }
+
+    function selectSymptom(type) {
+        currentSymptom = type;
+        document.getElementById('test-content').innerHTML = testData[type].instruction;
+        showScreen('screen-tests');
+    }
+
+    function showResult(isPositive) {
+        const resultHtml = isPositive ? testData[currentSymptom].pos : testData[currentSymptom].neg;
+        document.getElementById('final-diagnosis').innerHTML = resultHtml;
+        showScreen('screen-result');
+    }
+
+    function restartApp() {
+        const checkboxes = document.querySelectorAll('.redflag');
+        checkboxes.forEach(cb => cb.checked = false);
+        document.getElementById('alert-redflag').style.display = 'none';
+        showScreen('screen-redflags');
+    }
+</script>
+
+</body>
+</html>
